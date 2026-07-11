@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Squish — Image Compressor</title>
+
+  <!-- Space Grotesk (headings/wordmark) · Inter (body) · IBM Plex Mono (data readouts) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+
+  <!-- Ambient backdrop: vignette + grain + a single slow-drifting glow.
+       Purely decorative, aria-hidden, sits behind everything. -->
+  <div class="backdrop" aria-hidden="true">
+    <div class="backdrop__glow"></div>
+    <div class="backdrop__grain"></div>
+  </div>
+
+  <div class="page">
+
+    <!-- ============================= HEADER ============================= -->
+    <header class="header">
+      <div class="logo">
+        <span class="logo-mark" aria-hidden="true">
+          <!-- Aperture glyph: the tool's one visual motif, echoed in the
+               drop-zone icon and the gauge below. -->
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L14.5 8.5L21.5 9.5L16.2 14.3L17.8 21.3L12 17.5L6.2 21.3L7.8 14.3L2.5 9.5L9.5 8.5L12 2Z"
+                  stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" fill="none"/>
+          </svg>
+        </span>
+        <span class="logo-text">Squish</span>
+      </div>
+      <p class="tagline">A quiet darkroom for your images — drop one in, dial in the quality, take home a smaller print.</p>
+    </header>
+
+    <!-- ============================== MAIN =============================== -->
+    <main class="main">
+
+      <!-- ---------- STATE 1: Upload zone (visible until a file is chosen) ---------- -->
+      <section id="upload-section" class="card">
+        <div id="drop-zone" class="drop-zone" tabindex="0" role="button" aria-label="Upload an image">
+          <input type="file" id="file-input" accept="image/png, image/jpeg, image/webp, image/bmp, image/gif, image/tiff" hidden />
+
+          <div class="drop-zone__aperture" aria-hidden="true">
+            <svg viewBox="0 0 100 100" class="aperture-svg">
+              <g class="aperture-blades">
+                <polygon class="blade" points="50,50 50,6 68,10"></polygon>
+                <polygon class="blade" points="50,50 83,17 90,34"></polygon>
+                <polygon class="blade" points="50,50 94,50 90,68"></polygon>
+                <polygon class="blade" points="50,50 83,83 66,90"></polygon>
+                <polygon class="blade" points="50,50 50,94 32,90"></polygon>
+                <polygon class="blade" points="50,50 17,83 10,66"></polygon>
+                <polygon class="blade" points="50,50 6,50 10,32"></polygon>
+                <polygon class="blade" points="50,50 17,17 34,10"></polygon>
+              </g>
+              <circle cx="50" cy="50" r="16" class="aperture-hole"></circle>
+            </svg>
+          </div>
+
+          <p class="drop-zone__title">Drag &amp; drop an image here</p>
+          <p class="drop-zone__subtitle">or <span class="drop-zone__browse">browse from your device</span></p>
+          <p class="drop-zone__hint">PNG · JPG · WEBP · BMP · GIF · TIFF — up to 20MB</p>
+        </div>
+
+        <!-- Inline error message (hidden by default) -->
+        <p id="error-message" class="error-message" hidden></p>
+      </section>
+
+      <!-- ---------- STATE 2: Workspace (hidden until a file is loaded) ---------- -->
+      <section id="workspace-section" class="card" hidden>
+
+        <!-- Quality control: a light-meter style gauge driven by a real,
+             fully-accessible range input underneath it. -->
+        <div class="control-row">
+          <div class="control-row__header">
+            <span class="eyebrow">Compression</span>
+            <span class="readout readout--accent" id="quality-value">80<span class="readout__unit">%</span></span>
+          </div>
+
+          <div class="gauge" aria-hidden="true">
+            <svg viewBox="0 0 200 110" class="gauge-svg">
+              <path d="M10,100 A90,90 0 0 1 190,100" class="gauge-track" />
+              <path d="M10,100 A90,90 0 0 1 190,100" class="gauge-fill" id="gauge-fill" />
+              <line x1="100" y1="100" x2="100" y2="28" class="gauge-needle" id="gauge-needle" />
+              <circle cx="100" cy="100" r="6" class="gauge-hub" />
+            </svg>
+            <div class="gauge-scale">
+              <span>Smaller file</span>
+              <span>Higher quality</span>
+            </div>
+          </div>
+
+          <input type="range" id="quality-slider" min="1" max="100" value="80" class="slider" aria-label="Compression quality" />
+        </div>
+
+        <!-- Loading indicator, shown while waiting on the server -->
+        <div id="loading-indicator" class="loading-indicator" hidden>
+          <span class="spinner" aria-hidden="true"></span> Developing…
+        </div>
+
+        <!-- Before / After preview, styled like two negatives on a light table -->
+        <div class="preview-grid">
+          <div class="preview-pane">
+            <div class="preview-pane__label">Original</div>
+            <div class="preview-pane__image-wrap">
+              <img id="original-preview" alt="Original image preview" />
+            </div>
+            <div class="readout readout--panel" id="original-size">—</div>
+          </div>
+
+          <div class="preview-pane">
+            <div class="preview-pane__label">Compressed</div>
+            <div class="preview-pane__image-wrap">
+              <img id="compressed-preview" alt="Compressed image preview" />
+            </div>
+            <div class="readout readout--panel readout--panel-accent" id="compressed-size">—</div>
+          </div>
+        </div>
+
+        <!-- Summary of savings -->
+        <div id="savings-banner" class="savings-banner" hidden>
+          <span class="savings-banner__dot" aria-hidden="true"></span>
+          <span id="savings-text"></span>
+        </div>
+
+        <!-- Actions -->
+        <div class="actions">
+          <button id="reset-button" class="button button--ghost" type="button">Choose another image</button>
+          <a id="download-button" class="button button--primary" href="#" download>Download compressed image</a>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="footer">
+      <p>Built with Flask &amp; Pillow · Runs entirely on your local machine</p>
+    </footer>
+  </div>
+
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
